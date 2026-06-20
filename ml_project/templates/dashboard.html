@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – HeartSense ML{% endblock %}
+{% block nav_dash %}active{% endblock %}
+
+{% block body %}
+<div class="container">
+
+  <div style="padding:2.5rem 0 1.5rem;">
+    <div class="badge badge-blue" style="margin-bottom:.7rem;">Model Comparison · Performance Dashboard</div>
+    <h1 style="font-size:2rem; font-weight:800; line-height:1.2; margin-bottom:.5rem;">
+      Algorithm <span style="color:var(--accent2)">Benchmark</span>
+    </h1>
+    <p style="color:var(--muted); max-width:520px; line-height:1.6;">
+      All four models trained and evaluated on the same 800-record heart disease dataset.
+      Test split: 20% (160 samples), stratified.
+    </p>
+  </div>
+
+  <!-- Summary Cards -->
+  <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.5rem;">
+    {% set colors = ["#e84c4c","#4c9fe8","#4ce87a","#e8a84c"] %}
+    {% set keys = results.keys()|list %}
+    {% for name in keys %}
+    {% set r = results[name] %}
+    {% set c = colors[loop.index0] %}
+    <div class="card" style="border-top:3px solid {{ c }};">
+      <div style="font-size:.78rem; color:var(--muted); font-weight:600; margin-bottom:.4rem; text-transform:uppercase; letter-spacing:.05em;">
+        <span style="color:{{ c }}">■</span> {{ name }}
+      </div>
+      <div style="font-size:2rem; font-weight:800; line-height:1;">{{ r.accuracy }}%</div>
+      <div style="font-size:.78rem; color:var(--muted); margin-top:.2rem;">Accuracy</div>
+      <div style="margin-top:.7rem; display:grid; grid-template-columns:1fr 1fr; gap:.3rem;">
+        <div style="font-size:.78rem;"><span style="color:var(--muted)">F1</span> <strong>{{ r.f1 }}%</strong></div>
+        <div style="font-size:.78rem;"><span style="color:var(--muted)">AUC</span> <strong>{{ r.roc_auc }}%</strong></div>
+        <div style="font-size:.78rem;"><span style="color:var(--muted)">Prec</span> <strong>{{ r.precision }}%</strong></div>
+        <div style="font-size:.78rem;"><span style="color:var(--muted)">Recall</span> <strong>{{ r.recall }}%</strong></div>
+      </div>
+      <div style="margin-top:.6rem; font-size:.75rem; color:var(--muted);">⏱ {{ r.train_time }}s training</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+    <!-- Bar Chart -->
+    <div class="card">
+      <h2 style="font-size:.9rem; font-weight:700; margin-bottom:1.2rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em;">Metric Comparison</h2>
+      <canvas id="barChart" height="220"></canvas>
+    </div>
+    <!-- Radar Chart -->
+    <div class="card">
+      <h2 style="font-size:.9rem; font-weight:700; margin-bottom:1.2rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em;">Performance Radar</h2>
+      <canvas id="radarChart" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- Full Metrics Table -->
+  <div class="card" style="margin-bottom:1.5rem; overflow-x:auto;">
+    <h2 style="font-size:.9rem; font-weight:700; margin-bottom:1.2rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em;">Full Metrics Table</h2>
+    <table style="width:100%; border-collapse:collapse; font-size:.88rem;">
+      <thead>
+        <tr style="color:var(--muted); font-size:.78rem; text-transform:uppercase; letter-spacing:.06em;">
+          <th style="text-align:left; padding:.6rem .8rem; border-bottom:1px solid var(--border);">Model</th>
+          <th style="padding:.6rem .8rem; border-bottom:1px solid var(--border);">Accuracy</th>
+          <th style="padding:.6rem .8rem; border-bottom:1px solid var(--border);">Precision</th>
+          <th style="padding:.6rem .8rem; border-bottom:1px solid var(--border);">Recall</th>
+          <th style="padding:.6rem .8rem; border-bottom:1px solid var(--border);">F1 Score</th>
+          <th style="padding:.6rem .8rem; border-bottom:1px solid var(--border);">ROC-AUC</th>
+          <th style="padding:.6rem .8rem; border-bottom:1px solid var(--border);">Train Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set best_acc = namespace(val=0) %}
+        {% for name, r in results.items() %}
+          {% if r.accuracy > best_acc.val %}{% set best_acc.val = r.accuracy %}{% endif %}
+        {% endfor %}
+        {% for name in keys %}
+        {% set r = results[name] %}
+        {% set c = colors[loop.index0] %}
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:.75rem .8rem; font-weight:600;">
+            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:{{ c }}; margin-right:.5rem;"></span>
+            {{ name }}
+            {% if r.accuracy == best_acc.val %}<span class="badge badge-blue" style="margin-left:.5rem; font-size:.65rem;">Best</span>{% endif %}
+          </td>
+          <td style="text-align:center; padding:.75rem .8rem; font-family:var(--font-mono);">{{ r.accuracy }}%</td>
+          <td style="text-align:center; padding:.75rem .8rem; font-family:var(--font-mono);">{{ r.precision }}%</td>
+          <td style="text-align:center; padding:.75rem .8rem; font-family:var(--font-mono);">{{ r.recall }}%</td>
+          <td style="text-align:center; padding:.75rem .8rem; font-family:var(--font-mono);">{{ r.f1 }}%</td>
+          <td style="text-align:center; padding:.75rem .8rem; font-family:var(--font-mono);">{{ r.roc_auc }}%</td>
+          <td style="text-align:center; padding:.75rem .8rem; font-family:var(--font-mono); color:var(--muted);">{{ r.train_time }}s</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Confusion Matrices -->
+  <div class="card">
+    <h2 style="font-size:.9rem; font-weight:700; margin-bottom:1.2rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em;">Confusion Matrices</h2>
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1rem;">
+      {% for name in keys %}
+      {% set r = results[name] %}
+      {% set c = colors[loop.index0] %}
+      {% set cm = r.confusion_matrix %}
+      <div style="text-align:center;">
+        <div style="font-size:.78rem; font-weight:700; color:{{ c }}; margin-bottom:.6rem; text-transform:uppercase; letter-spacing:.05em;">{{ name }}</div>
+        <div style="display:inline-grid; grid-template-columns:1fr 1fr; gap:3px;">
+          {% set vals = [cm[0][0], cm[0][1], cm[1][0], cm[1][1]] %}
+          {% set total = vals|sum %}
+          {% set cell_colors = ["#4ce87a","#e84c4c","#e8a84c","#4ce87a"] %}
+          {% set cell_labels = ["TN","FP","FN","TP"] %}
+          {% for i in range(4) %}
+          <div style="width:64px; height:56px; background:rgba({{ '76,232,122' if i in [0,3] else '232,76,76' }},.1); border:1px solid rgba({{ '76,232,122' if i in [0,3] else '232,76,76' }},.25); border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            <div style="font-size:1.2rem; font-weight:800; color:{{ 'var(--accent3)' if i in [0,3] else 'var(--accent)' }};">{{ vals[i] }}</div>
+            <div style="font-size:.65rem; color:var(--muted);">{{ cell_labels[i] }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        <div style="margin-top:.5rem; font-size:.72rem; color:var(--muted);">
+          Pred → No / Yes
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+const RESULTS = {{ results | tojson }};
+const LABELS  = Object.keys(RESULTS);
+const COLORS  = ["#e84c4c","#4c9fe8","#4ce87a","#e8a84c"];
+
+Chart.defaults.color = "#8b949e";
+Chart.defaults.borderColor = "#30363d";
+
+// ── Bar Chart ──────────────────────────────────────────────────────────
+new Chart(document.getElementById("barChart"), {
+  type: "bar",
+  data: {
+    labels: ["Accuracy","Precision","Recall","F1","ROC-AUC"],
+    datasets: LABELS.map((name, i) => ({
+      label: name,
+      data: [
+        RESULTS[name].accuracy,
+        RESULTS[name].precision,
+        RESULTS[name].recall,
+        RESULTS[name].f1,
+        RESULTS[name].roc_auc,
+      ],
+      backgroundColor: COLORS[i] + "99",
+      borderColor: COLORS[i],
+      borderWidth: 1.5,
+      borderRadius: 4,
+    }))
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } } },
+    scales: {
+      y: { min: 60, max: 100, grid: { color:"#30363d" }, ticks: { callback: v => v+"%" } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// ── Radar Chart ─────────────────────────────────────────────────────────
+new Chart(document.getElementById("radarChart"), {
+  type: "radar",
+  data: {
+    labels: ["Accuracy","Precision","Recall","F1","ROC-AUC"],
+    datasets: LABELS.map((name, i) => ({
+      label: name,
+      data: [
+        RESULTS[name].accuracy,
+        RESULTS[name].precision,
+        RESULTS[name].recall,
+        RESULTS[name].f1,
+        RESULTS[name].roc_auc,
+      ],
+      borderColor: COLORS[i],
+      backgroundColor: COLORS[i] + "22",
+      pointBackgroundColor: COLORS[i],
+      borderWidth: 2,
+    }))
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } } },
+    scales: {
+      r: {
+        min: 60, max: 100,
+        grid: { color:"#30363d" },
+        pointLabels: { font: { size: 11 } },
+        ticks: { callback: v => v+"%", backdropColor:"transparent" }
+      }
+    }
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,74 @@
+{
+  "Random Forest": {
+    "accuracy": 80.62,
+    "precision": 82.79,
+    "recall": 90.99,
+    "f1": 86.7,
+    "roc_auc": 88.55,
+    "train_time": 0.171,
+    "confusion_matrix": [
+      [
+        28,
+        21
+      ],
+      [
+        10,
+        101
+      ]
+    ]
+  },
+  "Logistic Regression": {
+    "accuracy": 80.62,
+    "precision": 82.79,
+    "recall": 90.99,
+    "f1": 86.7,
+    "roc_auc": 85.9,
+    "train_time": 0.006,
+    "confusion_matrix": [
+      [
+        28,
+        21
+      ],
+      [
+        10,
+        101
+      ]
+    ]
+  },
+  "Decision Tree": {
+    "accuracy": 78.75,
+    "precision": 85.98,
+    "recall": 82.88,
+    "f1": 84.4,
+    "roc_auc": 77.61,
+    "train_time": 0.003,
+    "confusion_matrix": [
+      [
+        34,
+        15
+      ],
+      [
+        19,
+        92
+      ]
+    ]
+  },
+  "Gradient Boosting": {
+    "accuracy": 83.12,
+    "precision": 86.21,
+    "recall": 90.09,
+    "f1": 88.11,
+    "roc_auc": 89.89,
+    "train_time": 0.163,
+    "confusion_matrix": [
+      [
+        33,
+        16
+      ],
+      [
+        11,
+        100
+      ]
+    ]
+  }
+}

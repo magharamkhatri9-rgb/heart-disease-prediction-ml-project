@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Predict – HeartSense ML{% endblock %}
+{% block nav_predict %}active{% endblock %}
+
+{% block body %}
+<div class="container">
+
+  <!-- Hero -->
+  <div style="padding:2.5rem 0 1.5rem; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+    <div>
+      <div class="badge badge-red" style="margin-bottom:.7rem;">Machine Learning · Heart Disease Prediction</div>
+      <h1 style="font-size:2rem; font-weight:800; line-height:1.2; margin-bottom:.5rem;">
+        Cardiovascular Risk <span style="color:var(--accent)">Classifier</span>
+      </h1>
+      <p style="color:var(--muted); max-width:520px; line-height:1.6;">
+        Enter patient vitals below. Four locally-trained ML models will generate
+        predictions — no external APIs, no cloud calls.
+      </p>
+    </div>
+    <a href="/dashboard" class="btn btn-outline">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+      </svg>
+      View Dashboard
+    </a>
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 380px; gap:1.5rem; align-items:start;">
+
+    <!-- Input Form -->
+    <div class="card">
+      <h2 style="font-size:1rem; font-weight:700; margin-bottom:1.2rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em;">Patient Data</h2>
+      <form id="predict-form">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:.9rem;">
+          {% for fname, meta in features.items() %}
+          <div>
+            <label style="display:block; font-size:.82rem; color:var(--muted); margin-bottom:.3rem; font-weight:600;">
+              {{ meta.label }}{% if meta.get('unit') %} <span style="font-weight:400;">({{ meta.unit }})</span>{% endif %}
+            </label>
+            {% if meta.type == 'select' %}
+            <select name="{{ fname }}" style="width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:.5rem .7rem; border-radius:7px; font-size:.9rem;">
+              {% for val, lbl in meta.options %}
+              <option value="{{ val }}" {% if val == meta.default %}selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+            {% else %}
+            <input type="number" name="{{ fname }}"
+                   min="{{ meta.min }}" max="{{ meta.max }}" step="{{ meta.step }}" value="{{ meta.default }}"
+                   style="width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:.5rem .7rem; border-radius:7px; font-size:.9rem;">
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:1.3rem; width:100%; justify-content:center; font-size:1rem; padding:.8rem;">
+          Run All 4 Models →
+        </button>
+      </form>
+    </div>
+
+    <!-- Results Panel -->
+    <div>
+      <div class="card" id="results-panel" style="display:none;">
+        <h2 style="font-size:1rem; font-weight:700; margin-bottom:1.2rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em;">Predictions</h2>
+        <div id="model-cards" style="display:flex; flex-direction:column; gap:.85rem;"></div>
+        <div id="consensus" style="margin-top:1.3rem; padding:1rem; border-radius:9px; text-align:center; display:none;"></div>
+      </div>
+      <div id="loading" style="display:none;" class="card">
+        <div style="text-align:center; padding:2rem; color:var(--muted);">
+          <div class="spinner" style="width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; margin:0 auto 1rem;"></div>
+          Running models…
+        </div>
+      </div>
+
+      <!-- Model Legend -->
+      <div class="card" style="margin-top:1.2rem;">
+        <h3 style="font-size:.82rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:.9rem; font-weight:700;">Models Used</h3>
+        {% set models = [("Random Forest","#e84c4c"),("Logistic Regression","#4c9fe8"),("Decision Tree","#4ce87a"),("Gradient Boosting","#e8a84c")] %}
+        {% for m, c in models %}
+        <div style="display:flex; align-items:center; gap:.6rem; margin-bottom:.5rem; font-size:.88rem;">
+          <span style="width:10px; height:10px; border-radius:50%; background:{{ c }}; flex-shrink:0;"></span>
+          {{ m }}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+input[type=number]::-webkit-inner-spin-button { opacity: .4; }
+input:focus, select:focus {
+  outline: none; border-color: var(--accent2);
+  box-shadow: 0 0 0 2px rgba(76,159,232,.2);
+}
+.model-card { background: var(--bg); border:1px solid var(--border); border-radius:9px; padding:.85rem 1rem; }
+.prob-bar { height:6px; border-radius:3px; background: var(--border); margin-top:.45rem; overflow:hidden; }
+.prob-fill { height:100%; border-radius:3px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+</style>
+
+<script>
+const COLORS = {
+  "Random Forest":       "#e84c4c",
+  "Logistic Regression": "#4c9fe8",
+  "Decision Tree":       "#4ce87a",
+  "Gradient Boosting":   "#e8a84c",
+};
+
+document.getElementById("predict-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const data = Object.fromEntries(new FormData(form));
+
+  document.getElementById("loading").style.display = "block";
+  document.getElementById("results-panel").style.display = "none";
+
+  const resp = await fetch("/predict", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(data)
+  });
+  const results = await resp.json();
+
+  document.getElementById("loading").style.display = "none";
+  renderResults(results);
+});
+
+function renderResults(results) {
+  const panel = document.getElementById("results-panel");
+  const cards = document.getElementById("model-cards");
+  const cons  = document.getElementById("consensus");
+  panel.style.display = "block";
+  cards.innerHTML = "";
+
+  let posVotes = 0;
+  for (const [name, res] of Object.entries(results)) {
+    const color = COLORS[name] || "#8b949e";
+    const isDis = res.prediction === 1;
+    if (isDis) posVotes++;
+    const pct = res.probability;
+    const bar_color = pct > 65 ? "#e84c4c" : pct > 40 ? "#e8a84c" : "#4ce87a";
+
+    cards.innerHTML += `
+      <div class="model-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:.5rem;">
+            <span style="width:9px; height:9px; border-radius:50%; background:${color}; flex-shrink:0;"></span>
+            <span style="font-size:.88rem; font-weight:600;">${name}</span>
+          </div>
+          <span class="badge ${isDis ? 'badge-red' : 'badge-green'}" style="font-size:.72rem;">
+            ${isDis ? '⚠ High Risk' : '✓ Low Risk'}
+          </span>
+        </div>
+        <div style="margin-top:.5rem; font-size:.82rem; color:var(--muted);">
+          Disease probability: <strong style="color:${bar_color}">${pct}%</strong>
+        </div>
+        <div class="prob-bar">
+          <div class="prob-fill" style="width:0%; background:${bar_color};" data-width="${pct}"></div>
+        </div>
+      </div>`;
+  }
+
+  // animate bars
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".prob-fill").forEach(el => {
+      el.style.width = el.dataset.width + "%";
+    });
+  });
+
+  const majority = posVotes > Object.keys(results).length / 2;
+  cons.style.display = "block";
+  cons.style.background = majority ? "rgba(232,76,76,.1)" : "rgba(76,232,122,.1)";
+  cons.style.border = majority ? "1px solid rgba(232,76,76,.3)" : "1px solid rgba(76,232,122,.3)";
+  cons.innerHTML = `
+    <div style="font-size:.85rem; color:var(--muted); margin-bottom:.3rem;">Ensemble Consensus</div>
+    <div style="font-size:1.15rem; font-weight:800; color:${majority ? 'var(--accent)' : 'var(--accent3)'};">
+      ${majority ? '⚠ Elevated Cardiovascular Risk' : '✓ Low Cardiovascular Risk'}
+    </div>
+    <div style="font-size:.82rem; color:var(--muted); margin-top:.3rem;">
+      ${posVotes} of ${Object.keys(results).length} models predict disease
+    </div>`;
+}
+</script>
+{% endblock %}
